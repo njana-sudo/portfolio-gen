@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { parseResume } from "@/lib/resume";
-import { parseResumeWithGemini, ResumeData } from "@/lib/gemini";
-import fs from "fs/promises";
-import path from "path";
+import { upsertUser, upsertResumeData, upsertCodingStats } from "@/lib/db-queries";
 
 export async function POST(req: NextRequest) {
     try {
@@ -13,6 +11,7 @@ export async function POST(req: NextRequest) {
         const username = formData.get("username") as string;
         const leetCodeUser = formData.get("leetCodeUser") as string;
         const codeforcesUser = formData.get("codeforcesUser") as string;
+        const aboutMe = formData.get("aboutMe") as string;
 
         console.log("[UPLOAD] Username:", username);
         console.log("[UPLOAD] File:", file ? `${file.name} (${file.size} bytes)` : "No file");
@@ -21,24 +20,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Username is required" }, { status: 400 });
         }
 
-        const dataDir = path.join(process.cwd(), "data");
-        const publicDir = path.join(process.cwd(), "public", "resumes");
-        await fs.mkdir(dataDir, { recursive: true });
-        await fs.mkdir(publicDir, { recursive: true });
-
-        const filePath = path.join(dataDir, `${username}.json`);
-        const resumePath = path.join(publicDir, `${username}.pdf`);
-
         // 1. Parsing the PDF (Fast)
         let resumeText = "";
         if (file) {
             try {
                 const buffer = Buffer.from(await file.arrayBuffer());
-
-                // Save the actual PDF file for download
-                await fs.writeFile(resumePath, buffer);
-                console.log("[UPLOAD] PDF saved to:", resumePath);
-
                 resumeText = await parseResume(buffer);
                 console.log("[UPLOAD] Resume parsed, text length:", resumeText.length);
             } catch (parseError) {
@@ -47,55 +33,73 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // 2. Load EXISTING data if file is missing (to preserve resumeText)
-        let existingData: any = {};
+        // 2. Database Operations
+
+        // Debug: Check if DB URL is available (don't log the full secret)
+        if (!process.env.DATABASE_URL) {
+            console.error("[UPLOAD] DATABASE_URL is missing in environment variables");
+            return NextResponse.json({
+                error: "Configuration Error",
+                details: "Database connection string is missing"
+            }, { status: 500 });
+        }
+
+        let user;
         try {
-            const fileContent = await fs.readFile(filePath, "utf-8");
-            existingData = JSON.parse(fileContent);
-        } catch (e) {
-            // File doesn't exist, that's fine
+            console.log(`[UPLOAD] Attempting to upsert user: ${username}`);
+            // Ensure user exists
+            user = await upsertUser({
+                username,
+            });
+            console.log(`[UPLOAD] User upserted successfully. User ID: ${user?.id}`);
+        } catch (dbError) {
+            console.error("[UPLOAD] Database Error (User Upsert):", dbError);
+            return NextResponse.json({
+                error: "Database Error",
+                details: dbError instanceof Error ? dbError.message : "Failed to create/update user"
+            }, { status: 500 });
         }
 
-        // 3. Prepare NEW data
-        // If a field is submitted (even if empty string), use it. Otherwise preserve existing.
-        const submittedLeetCode = formData.has("leetCodeUser");
-        const submittedCodeforces = formData.has("codeforcesUser");
-        const submittedAboutMe = formData.has("aboutMe");
-        const aboutMe = formData.get("aboutMe") as string;
+        if (!user) {
+            console.error("[UPLOAD] User upsert returned null/undefined");
+            return NextResponse.json({ error: "Database Error: Failed to create user record" }, { status: 500 });
+        }
 
-        let userData = {
-            username,
-            leetCodeUser: submittedLeetCode ? (leetCodeUser || null) : (existingData.leetCodeUser || null),
-            codeforcesUser: submittedCodeforces ? (codeforcesUser || null) : (existingData.codeforcesUser || null),
-            aboutMe: submittedAboutMe ? (aboutMe || null) : (existingData.aboutMe || null),
-            resumeText: resumeText || existingData.resumeText || "",
-            structuredData: existingData.structuredData || null,
-            lastUpdated: new Date().toISOString(),
-        };
+        try {
+            // Update Resume Data
+            console.log("[UPLOAD] Updating resume data...");
+            await upsertResumeData(user.id, {
+                resumeText,
+                professionalSummary: undefined,
+                aboutMe: aboutMe || undefined,
+                skills: [], // Explicitly provide to avoid DB default
+                experience: [], // Explicitly provide to avoid DB default
+                education: [], // Explicitly provide to avoid DB default
+                certifications: [], // Explicitly provide to avoid DB default
+                interests: [], // Explicitly provide to avoid DB default
+                contactInfo: undefined,
+            });
+            console.log("[UPLOAD] Resume data saved");
 
-        // FORCE OVERWRITE: Ensure we are replacing the file content completely
-        await fs.writeFile(filePath, JSON.stringify(userData, null, 2), { flag: 'w' });
-        console.log(`[UPLOAD] OVERWROTE data for ${username} with LeetCode user: ${leetCodeUser}`);
-        console.log("[UPLOAD] Initial data saved.");
-
-        // 3. AI Processing (Slow - might timeout or fail)
-        if (resumeText && resumeText.length > 50) { // Only process if there's substantial text
-            try {
-                console.log("[UPLOAD] Starting Gemini parsing...");
-                // SKIP AI due to Rate Limits (429) crashing the request
-                // const parsedData = await parseResumeWithGemini(resumeText);
-                const parsedData = null;
-                if (parsedData) {
-                    userData.structuredData = parsedData;
-                    // Update file with rich data
-                    await fs.writeFile(filePath, JSON.stringify(userData, null, 2));
-                    console.log("[UPLOAD] Rich data saved.");
-                }
-            } catch (aiError) {
-                console.error("[UPLOAD] AI Error:", aiError);
-                // We already saved the text version, so we are safe.
+            // Update Coding Stats
+            if (leetCodeUser || codeforcesUser) {
+                console.log("[UPLOAD] Updating coding stats...");
+                await upsertCodingStats(user.id, {
+                    leetcodeUsername: leetCodeUser || null,
+                    codeforcesUsername: codeforcesUser || null,
+                });
+                console.log("[UPLOAD] Coding stats saved");
             }
+        } catch (dbError) {
+            console.error("[UPLOAD] Database Error (Secondary Data):", dbError);
+            // Verify if we should fail here or just log. For now, let's fail to catch issues.
+            return NextResponse.json({
+                error: "Database Error",
+                details: "Failed to save profile details: " + (dbError instanceof Error ? dbError.message : String(dbError))
+            }, { status: 500 });
         }
+
+        console.log(`[UPLOAD] Database transaction complete for ${username}`);
 
         revalidatePath(`/portfolio/${username}`);
         revalidatePath("/");

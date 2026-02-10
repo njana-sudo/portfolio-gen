@@ -71,10 +71,12 @@ async function getResumeData(username: string) {
 export default async function PortfolioPage({ params }: { params: Promise<{ username: string }> }) {
     const { username } = await params;
 
-    // 1. Fetch Data
-    const profile = await getGitHubProfile(username);
-    const repos = await getGitHubRepos(username);
-    const resumeData = await getResumeData(username);
+    // 1. Fetch Data (Parallel for performance)
+    const [profile, repos, resumeData] = await Promise.all([
+        getGitHubProfile(username),
+        getGitHubRepos(username),
+        getResumeData(username)
+    ]);
 
     // Fetch Coding Stats if usernames are available
     const leetCodeUser = resumeData?.leetCodeUser;

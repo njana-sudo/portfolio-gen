@@ -3,7 +3,7 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
 const isProtectedRoute = createRouteMatcher([
     '/dashboard(.*)',
-    '/api/upload(.*)',
+    // '/api/upload(.*)', // Allow public upload for landing page generator
     '/ats-check(.*)',
     '/api/ats(.*)',
 ]);

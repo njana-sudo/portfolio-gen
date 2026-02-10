@@ -20,6 +20,13 @@ export function GeneratorForm() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!username) return;
+
+        // Check file size (Vercel limit is 4.5MB)
+        if (file && file.size > 4 * 1024 * 1024) {
+            alert("File is too large! Please upload a PDF smaller than 4MB.");
+            return;
+        }
+
         setLoading(true);
 
         try {
@@ -39,7 +46,7 @@ export function GeneratorForm() {
                 const errorText = await response.text();
                 try {
                     const errorData = JSON.parse(errorText);
-                    alert(`Upload failed: ${errorData.error || response.statusText}`);
+                    alert(`Upload failed: ${errorData.error || response.statusText}\nDetails: ${errorData.details || "No details provided"}`);
                 } catch (e) {
                     alert(`Server Error (${response.status}): Check console for details.`);
                 }

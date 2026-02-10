@@ -4,6 +4,9 @@ import fs from "fs";
 import path from "path";
 
 const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+if (!apiKey) {
+    console.warn("WARN: NEXT_PUBLIC_GEMINI_API_KEY is not set. AI features will be disabled.");
+}
 const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 const model = genAI ? genAI.getGenerativeModel({ model: "gemini-2.0-flash" }) : null;
 

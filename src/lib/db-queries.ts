@@ -1,6 +1,7 @@
 import { db } from '@/db';
 import { users, resumeData, codingStats, projects, githubContributions } from '@/db/schema';
 import { eq } from 'drizzle-orm';
+import { createId } from '@paralleldrive/cuid2';
 
 /**
  * Get user by username
@@ -91,6 +92,7 @@ export async function upsertResumeData(userId: string, data: {
     const [resume] = await db
         .insert(resumeData)
         .values({
+            id: createId(),
             userId,
             ...data,
         })

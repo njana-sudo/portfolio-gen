@@ -44,3 +44,5 @@ test-*.js
 
 # gemini cache
 data/gemini-cache.json
+
+.vercel
