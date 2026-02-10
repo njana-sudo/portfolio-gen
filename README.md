@@ -27,5 +27,6 @@ An AI-powered tool that turns your GitHub profile and Resume into a professional
 
 ## Usage
 - Enter your GitHub username.
+- Enter Leetcode username. (Optional)
 - (Optional) Upload a PDF resume.
 - Click "Generate Portfolio".
