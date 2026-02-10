@@ -60,11 +60,14 @@ export async function POST(req: NextRequest) {
         // If a field is submitted (even if empty string), use it. Otherwise preserve existing.
         const submittedLeetCode = formData.has("leetCodeUser");
         const submittedCodeforces = formData.has("codeforcesUser");
+        const submittedAboutMe = formData.has("aboutMe");
+        const aboutMe = formData.get("aboutMe") as string;
 
         let userData = {
             username,
             leetCodeUser: submittedLeetCode ? (leetCodeUser || null) : (existingData.leetCodeUser || null),
             codeforcesUser: submittedCodeforces ? (codeforcesUser || null) : (existingData.codeforcesUser || null),
+            aboutMe: submittedAboutMe ? (aboutMe || null) : (existingData.aboutMe || null),
             resumeText: resumeText || existingData.resumeText || "",
             structuredData: existingData.structuredData || null,
             lastUpdated: new Date().toISOString(),

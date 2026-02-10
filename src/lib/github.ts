@@ -17,12 +17,14 @@ export interface GitHubProfile {
   blog: string | null;
   company: string | null;
   location: string | null;
+  twitter_username: string | null;
 }
 
 export interface GitHubRepo {
   name: string;
   description: string;
   html_url: string;
+  homepage: string | null;
   language: string;
   stargazers_count: number;
   forks_count: number;
@@ -49,6 +51,7 @@ export async function getGitHubProfile(username: string): Promise<GitHubProfile 
       blog: data.blog,
       company: data.company,
       location: data.location,
+      twitter_username: data.twitter_username || null,
     };
   } catch (error: any) {
     console.error("Error fetching GitHub profile:", error);
@@ -72,6 +75,7 @@ export async function getGitHubRepos(username: string): Promise<GitHubRepo[]> {
       name: repo.name,
       description: repo.description || "",
       html_url: repo.html_url,
+      homepage: repo.homepage || null,
       language: repo.language || "Unknown",
       stargazers_count: repo.stargazers_count,
       forks_count: repo.forks_count,

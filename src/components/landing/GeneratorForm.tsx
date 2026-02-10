@@ -12,6 +12,7 @@ export function GeneratorForm() {
     const [username, setUsername] = useState("");
     const [leetCodeUser, setLeetCodeUser] = useState("");
     const [codeforcesUser, setCodeforcesUser] = useState("");
+    const [aboutMe, setAboutMe] = useState("");
     const [file, setFile] = useState<File | null>(null);
     const router = useRouter();
     const [loading, setLoading] = useState(false);
@@ -26,6 +27,7 @@ export function GeneratorForm() {
             formData.append("username", username);
             formData.append("leetCodeUser", leetCodeUser);
             formData.append("codeforcesUser", codeforcesUser);
+            formData.append("aboutMe", aboutMe);
             if (file) formData.append("resume", file);
 
             const response = await fetch("/api/upload", {
@@ -98,6 +100,16 @@ export function GeneratorForm() {
                             onChange={(e) => setCodeforcesUser(e.target.value)}
                         />
                     </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label className="text-slate-600 font-semibold text-xs uppercase tracking-wide">About Me (Optional)</Label>
+                    <textarea
+                        placeholder="Write a short bio about yourself..."
+                        className="w-full min-h-[100px] p-3 rounded-lg bg-white border border-slate-200 focus:border-purple-500 focus:ring-purple-200 text-sm resize-none"
+                        value={aboutMe}
+                        onChange={(e) => setAboutMe(e.target.value)}
+                    />
                 </div>
 
                 <div className="space-y-2">

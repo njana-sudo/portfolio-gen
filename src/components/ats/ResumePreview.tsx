@@ -7,6 +7,7 @@ export interface ResumeData {
         name: string;
         contact: string;
         summary: string;
+        customAboutMe?: string;
     };
     experience: {
         role: string;

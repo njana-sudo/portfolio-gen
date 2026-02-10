@@ -96,6 +96,28 @@ export default function PortfolioPreviewPage() {
                 <Button
                     size="sm"
                     className="shadow-lg bg-gradient-to-r from-pink-400 to-pink-500 hover:from-pink-500 hover:to-pink-600 text-white border-0 font-semibold"
+                    onClick={async () => {
+                        try {
+                            if (!data) return;
+                            const res = await fetch("/api/portfolio/deploy", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    username: data.personalInfo.contact.match(/github\.com\/([a-zA-Z0-9-]+)/)?.[1] || "user", // Fallback info
+                                    resumeData: data
+                                })
+                            });
+                            if (res.ok) {
+                                const json = await res.json();
+                                window.location.href = `/portfolio/${json.username}`;
+                            } else {
+                                alert("Failed to deploy. Please try again.");
+                            }
+                        } catch (e) {
+                            console.error(e);
+                            alert("Deployment error.");
+                        }
+                    }}
                 >
                     <span className="mr-2">✨</span>
                     🚀 Deploy Portfolio Website

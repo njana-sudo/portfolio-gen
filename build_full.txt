@@ -1,0 +1,34 @@
+
+> resume-to-portfolio@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+  Creating an optimized production build ...
+
+> Build error occurred
+Error: Turbopack build failed with 1 errors:
+./src/app/portfolio/portfolio-theme.css
+Error evaluating Node.js code
+CssSyntaxError: D:\Hackathon\Google AI Studio\resume-to-portfolio\src\app\portfolio\portfolio-theme.css:81:3: The `outline-ring/50` class does not exist. If `outline-ring/50` is a custom class, make sure it is defined within a `@layer` directive.
+    at Input.error (node_modules/postcss/lib/input.js:135:16) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\node_modules_fe693df6._.js:4651:22]
+    at AtRule.error (node_modules/postcss/lib/node.js:146:32) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\node_modules_fe693df6._.js:928:38]
+    [at processApply (D:\Hackathon\Google AI Studio\resume-to-portfolio\node_modules\tailwindcss\lib\lib\expandApplyAtRules.js:380:29)]
+    [at D:\Hackathon\Google AI Studio\resume-to-portfolio\node_modules\tailwindcss\lib\lib\expandApplyAtRules.js:551:9]
+    [at D:\Hackathon\Google AI Studio\resume-to-portfolio\node_modules\tailwindcss\lib\processTailwindFeatures.js:55:50]
+    [at process.processTicksAndRejections (node:internal/process/task_queues:103:5)]
+    [at async plugins (D:\Hackathon\Google AI Studio\resume-to-portfolio\node_modules\tailwindcss\lib\plugin.js:38:17)]
+    at async LazyResult.runAsync (node_modules/postcss/lib/lazy-result.js:293:11) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\node_modules_fe693df6._.js:6206:21]
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\[root-of-the-server]__51225daf._.js:147:36]
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\[root-of-the-server]__974941ed._.js:443:31]
+
+Import trace:
+  Client Component Browser:
+    ./src/app/portfolio/portfolio-theme.css [Client Component Browser]
+    ./src/app/portfolio/[username]/page.tsx [Server Component]
+
+
+    at async transform (turbopack:///[turbopack-node]/transforms/postcss.ts:70:34) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\[root-of-the-server]__51225daf._.js:147:36])
+    at async run (turbopack:///[turbopack-node]/ipc/evaluate.ts:92:23) [D:\Hackathon\Google AI Studio\resume-to-portfolio\.next\build\chunks\[root-of-the-server]__974941ed._.js:443:31])

@@ -1,0 +1,176 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/db';
+import { upsertUser, upsertProjects, upsertGithubContributions } from '@/lib/db-queries';
+import { getGitHubProfile, getGitHubRepos, getGitHubContributions } from '@/lib/github';
+import fs from 'fs';
+import path from 'path';
+
+interface JsonData {
+    username: string;
+    leetCodeUser?: string | null;
+    codeforcesUser?: string | null;
+    aboutMe?: string;
+    resumeText?: string;
+    structuredData?: any;
+    lastUpdated?: string;
+}
+
+async function migrateUser(username: string, aboutMe?: string) {
+    console.log(`\n📦 Migrating user: ${username}`);
+
+    try {
+        // Fetch GitHub profile
+        console.log(`  ⬇️  Fetching GitHub profile...`);
+        const profile = await getGitHubProfile(username);
+
+        if (!profile) {
+            console.log(`  ❌ Failed to fetch profile for ${username}`);
+            return { success: false, username, error: 'Failed to fetch profile' };
+        }
+
+        // Insert/Update user
+        console.log(`  💾 Saving user to database...`);
+        const user = await upsertUser({
+            username: profile.username,
+            email: profile.email || undefined,
+            githubUrl: profile.html_url,
+            avatarUrl: profile.avatar_url,
+            bio: aboutMe || profile.bio || undefined,
+            location: profile.location || undefined,
+            company: profile.company || undefined,
+            twitterUsername: profile.twitter_username || undefined,
+            websiteUrl: profile.blog || undefined,
+            publicRepos: profile.public_repos,
+            followers: profile.followers,
+            following: profile.following,
+        });
+
+        console.log(`  ✅ User saved with ID: ${user.id}`);
+
+        // Fetch and save repositories
+        console.log(`  ⬇️  Fetching repositories...`);
+        const repos = await getGitHubRepos(username);
+
+        if (repos.length > 0) {
+            console.log(`  💾 Saving ${repos.length} repositories...`);
+            await upsertProjects(
+                user.id,
+                repos.map(repo => ({
+                    name: repo.name,
+                    description: repo.description || undefined,
+                    htmlUrl: repo.html_url,
+                    homepageUrl: repo.homepage || undefined,
+                    language: repo.language,
+                    topics: repo.topics,
+                    stars: repo.stargazers_count,
+                    forks: repo.forks_count,
+                }))
+            );
+            console.log(`  ✅ Repositories saved`);
+        }
+
+        // Fetch and save contributions
+        console.log(`  ⬇️  Fetching contribution data...`);
+        const contributions = await getGitHubContributions(username);
+
+        if (contributions) {
+            let totalContributions = 0;
+            let currentStreak = 0;
+            let longestStreak = 0;
+            let tempStreak = 0;
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const allDays = contributions.flatMap(week => week.days).sort((a, b) =>
+                new Date(b.date).getTime() - new Date(a.date).getTime()
+            );
+
+            for (const day of allDays) {
+                totalContributions += day.count;
+                if (day.count > 0) {
+                    tempStreak++;
+                    longestStreak = Math.max(longestStreak, tempStreak);
+                } else {
+                    tempStreak = 0;
+                }
+            }
+
+            for (const day of allDays) {
+                const dayDate = new Date(day.date);
+                dayDate.setHours(0, 0, 0, 0);
+                if (day.count > 0) {
+                    currentStreak++;
+                } else if (dayDate < today) {
+                    break;
+                }
+            }
+
+            console.log(`  💾 Saving contribution data...`);
+            await upsertGithubContributions(user.id, {
+                contributionData: contributions,
+                totalContributions,
+                currentStreak,
+                longestStreak,
+            });
+            console.log(`  ✅ Contributions saved`);
+        }
+
+        console.log(`  ✨ Migration completed for ${username}`);
+        return { success: true, username, userId: user.id };
+
+    } catch (error: any) {
+        console.error(`  ❌ Error migrating ${username}:`, error.message);
+        return { success: false, username, error: error.message };
+    }
+}
+
+export async function GET(req: NextRequest) {
+    console.log('🚀 Starting JSON to Database Migration\n');
+
+    const dataDir = path.join(process.cwd(), 'data');
+    const files = fs.readdirSync(dataDir).filter(f => f.endsWith('.json') && f !== 'gemini-cache.json');
+
+    console.log(`\n📁 Found ${files.length} JSON files to process\n`);
+
+    const results = [];
+
+    for (const file of files) {
+        const filePath = path.join(dataDir, file);
+        const content = fs.readFileSync(filePath, 'utf-8');
+
+        try {
+            const data: JsonData = JSON.parse(content);
+
+            if (data.username) {
+                const result = await migrateUser(data.username, data.aboutMe);
+                results.push(result);
+
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            } else {
+                results.push({ success: false, file, error: 'No username found' });
+            }
+        } catch (error: any) {
+            results.push({ success: false, file, error: error.message });
+        }
+    }
+
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.filter(r => !r.success).length;
+
+    console.log('\n📊 Migration Summary:');
+    console.log(`  ✅ Successful: ${successCount}`);
+    console.log(`  ❌ Failed: ${failCount}`);
+    console.log(`  📝 Total: ${files.length}`);
+
+    return NextResponse.json({
+        success: true,
+        summary: {
+            total: files.length,
+            successful: successCount,
+            failed: failCount
+        },
+        results
+    });
+}

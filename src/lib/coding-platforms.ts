@@ -11,13 +11,20 @@ export interface LeetCodeStats {
 
 export async function getLeetCodeStats(username: string): Promise<LeetCodeStats | null> {
     try {
-        // Primary API: alfa-leetcode-api
-        // This is comprehensive but hosted on Render (cold starts likely)
+        // Primary API
         const fetchPrimary = async () => {
+            console.log(`[LeetCode] Fetching from primary API for: ${username}`);
             const [profileRes, contestRes] = await Promise.all([
-                fetch(`https://alfa-leetcode-api.onrender.com/${username}/solved`, { signal: AbortSignal.timeout(4000) }),
-                fetch(`https://alfa-leetcode-api.onrender.com/${username}/contest`, { signal: AbortSignal.timeout(4000) })
+                fetch(`https://alfa-leetcode-api.onrender.com/${username}/solved`, {
+                    signal: AbortSignal.timeout(5000),
+                    next: { revalidate: 3600 }
+                }),
+                fetch(`https://alfa-leetcode-api.onrender.com/${username}/contest`, {
+                    signal: AbortSignal.timeout(5000),
+                    next: { revalidate: 3600 }
+                })
             ]);
+
             if (!profileRes.ok) throw new Error("Primary API Profile Failed");
             const profileData = await profileRes.json();
             const contestData = contestRes.ok ? await contestRes.json() : {};
@@ -34,11 +41,13 @@ export async function getLeetCodeStats(username: string): Promise<LeetCodeStats 
             };
         };
 
-        // Fallback API: leetcode-stats-api (Heroku)
-        // Faster but less data (no contest rating usually)
+        // Fallback API
         const fetchFallback = async () => {
-            console.log("Attempting fallback LeetCode API...");
-            const res = await fetch(`https://leetcode-stats-api.herokuapp.com/${username}`);
+            console.log(`[LeetCode] Attempting fallback API for: ${username}`);
+            const res = await fetch(`https://leetcode-stats-api.herokuapp.com/${username}`, {
+                signal: AbortSignal.timeout(5000),
+                next: { revalidate: 3600 }
+            });
             if (!res.ok) throw new Error("Fallback API Failed");
             const data = await res.json();
             if (data.status === "error") throw new Error("Fallback API Error: " + data.message);
@@ -49,7 +58,7 @@ export async function getLeetCodeStats(username: string): Promise<LeetCodeStats 
                 easySolved: data.easySolved || 0,
                 mediumSolved: data.mediumSolved || 0,
                 hardSolved: data.hardSolved || 0,
-                contestRating: 0, // Not available in this API
+                contestRating: 0,
                 contestGlobalRanking: data.ranking || 0,
                 totalContest: 0
             };
@@ -57,21 +66,20 @@ export async function getLeetCodeStats(username: string): Promise<LeetCodeStats 
 
         // Try primary first, then fallback
         try {
-            console.log(`[LeetCode] Attempting stats fetch for: ${username}`);
             return await fetchPrimary();
         } catch (primaryError) {
             console.warn(`[LeetCode] Primary API failed for ${username}:`, primaryError);
             try {
                 return await fetchFallback();
             } catch (fallbackError) {
-                console.error(`[LeetCode] Fallback API also failed for ${username}:`, fallbackError);
-                return null;
+                console.error(`[LeetCode] Both APIs failed for ${username}:`, fallbackError);
+                return null; // Return null instead of throwing
             }
         }
 
     } catch (error) {
         console.error(`[LeetCode] CRITICAL ERROR for ${username}:`, error);
-        return null;
+        return null; // Gracefully handle any unexpected errors
     }
 }
 
@@ -84,21 +92,26 @@ export interface CodeforcesStats {
 
 export async function getCodeforcesStats(username: string): Promise<CodeforcesStats | null> {
     try {
-        const response = await fetch(`https://codeforces.com/api/user.info?handles=${username}`);
+        const response = await fetch(`https://codeforces.com/api/user.info?handles=${username}`, {
+            signal: AbortSignal.timeout(5000),
+            next: { revalidate: 3600 }
+        });
         if (!response.ok) return null;
 
         const data = await response.json();
-        if (data.status !== 'OK') return null;
+        if (data.status !== 'OK' || !data.result || data.result.length === 0) {
+            return null;
+        }
 
         const user = data.result[0];
         return {
-            rating: user.rating,
-            rank: user.rank,
-            maxRating: user.maxRating,
-            maxRank: user.maxRank
+            rating: user.rating || 0,
+            rank: user.rank || 'unrated',
+            maxRating: user.maxRating || 0,
+            maxRank: user.maxRank || 'unrated',
         };
     } catch (error) {
-        console.error("Error fetching Codeforces stats:", error);
+        console.error(`[Codeforces] Error fetching stats for ${username}:`, error);
         return null;
     }
 }

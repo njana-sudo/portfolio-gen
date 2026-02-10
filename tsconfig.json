@@ -38,6 +38,7 @@
   ],
   "exclude": [
     "node_modules",
-    "Enhance Landing Page"
+    "Enhance Landing Page",
+    "Portfolio Design"
   ]
 }
